@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Seguridad y Administración | NovaComercial</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Saltar al contenido principal</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">NC</span>
+        <span>NovaComercial</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Navegación principal">
+        <span id="session-pill" class="user-pill"></span>
+        <button type="button" id="logout-btn" class="btn btn-secondary btn-sm">Cerrar sesión</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" class="container">
+    <div class="flex-between" style="margin-bottom: 1rem;">
+      <div>
+        <h1>Panel de Administración y Seguridad</h1>
+        <p class="subtitle" style="margin-bottom: 0;">
+          Supervisión de controles de autorización y registro de auditoría de accesos.
+        </p>
+      </div>
+      <button type="button" id="reset-demo-btn" class="btn btn-secondary btn-sm">
+        Reiniciar simulación
+      </button>
+    </div>
+
+    <div id="status-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
+
+    <!-- Control de Autorización -->
+    <section class="card" aria-labelledby="authz-control-title">
+      <div class="flex-between">
+        <div>
+          <h2 id="authz-control-title">Control de autorización en el servidor</h2>
+          <p id="mode-description" class="subtitle" style="margin-bottom: 0;"></p>
+        </div>
+        <span id="mode-badge" class="badge"></span>
+      </div>
+
+      <div id="mode-alert" class="alert" style="margin-top: 1rem;"></div>
+
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <button type="button" id="toggle-security-btn" class="btn"></button>
+      </div>
+    </section>
+
+    <!-- Registro de Auditoría -->
+    <section class="card" aria-labelledby="audit-title">
+      <div class="flex-between" style="margin-bottom: 0.75rem;">
+        <h2 id="audit-title" style="margin-bottom: 0;">Registro de auditoría de accesos</h2>
+        <span class="badge badge-info">Tiempo real</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Eventos recientes de inicio de sesión y consulta de perfiles</caption>
+          <thead>
+            <tr>
+              <th scope="col">Hora</th>
+              <th scope="col">Usuario (Sesión)</th>
+              <th scope="col">Acción solicitada</th>
+              <th scope="col">Resultado</th>
+            </tr>
+          </thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Clientes registrados -->
+    <section class="card" aria-labelledby="clients-title">
+      <h2 id="clients-title">Cuentas de clientes registradas</h2>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Lista de clientes en el sistema</caption>
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Nombre</th>
+              <th scope="col">Correo</th>
+              <th scope="col">Pedidos</th>
+              <th scope="col">Acceso directo</th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    NovaComercial S.A. de C.V. · Consola de Seguridad
+  </footer>
+
+  <script src="data.js"></script>
+  <script>
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      window.location.href = "index.html";
+    } else if (currentUser.role !== "admin") {
+      window.location.href = `perfil.html?id=${currentUser.id}`;
+    }
+
+    document.getElementById("session-pill").innerHTML =
+      `Sesión: <strong>${currentUser.nombre}</strong> (Admin)`;
+    document.getElementById("logout-btn").addEventListener("click", logout);
+
+    function renderSecurityState() {
+      const mode = getSecurityMode();
+      const isProtected = mode === "protected";
+
+      const badge = document.getElementById("mode-badge");
+      const desc = document.getElementById("mode-description");
+      const alertBox = document.getElementById("mode-alert");
+      const toggleBtn = document.getElementById("toggle-security-btn");
+
+      if (isProtected) {
+        badge.className = "badge badge-success";
+        badge.textContent = "PROTEGIDO · Autorización activa";
+        desc.textContent =
+          "El servidor verifica tanto la autenticación como los permisos (session.id === requestedId).";
+        alertBox.className = "alert alert-success";
+        alertBox.innerHTML =
+          "<strong>Mitigación aplicada:</strong> Si un usuario intenta cambiar el parámetro <code>?id=</code> por el de otro cliente, el sistema bloqueará la solicitud con un error <strong>403 Acceso Denegado</strong>.";
+        toggleBtn.className = "btn btn-secondary";
+        toggleBtn.textContent = "Desactivar protección (volver a modo vulnerable)";
+      } else {
+        badge.className = "badge badge-danger";
+        badge.textContent = "VULNERABLE · Sin verificación de permisos";
+        desc.textContent =
+          "El sistema solo verifica si el usuario inició sesión (autenticación), pero no valida si tiene permiso para ver el ID solicitado.";
+        alertBox.className = "alert alert-danger";
+        alertBox.innerHTML =
+          "<strong>Vulnerabilidad detectada (IDOR / Acceso no autorizado):</strong> Cualquier usuario autenticado puede cambiar <code>?id=105</code> por <code>?id=106</code> en la URL y visualizar datos privados ajenos.";
+        toggleBtn.className = "btn btn-success";
+        toggleBtn.textContent = "Activar control de autorización (Aplicar mitigación)";
+      }
+    }
+
+    function renderAuditLogs() {
+      const logs = getAuditLogs();
+      const tbody = document.getElementById("audit-tbody");
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4">Aún no hay eventos registrados en esta sesión.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = logs
+        .map((log) => {
+          let badgeClass = "badge-info";
+          if (log.resultado.includes("Vulnerable")) badgeClass = "badge-danger";
+          else if (log.resultado.includes("Bloqueado")) badgeClass = "badge-warning";
+          else if (log.resultado === "Autorizado" || log.resultado === "Autenticado") badgeClass = "badge-success";
+
+          return `
+            <tr>
+              <td>${log.hora}</td>
+              <td>${log.actorNombre} (ID #${log.actorId})</td>
+              <td>${log.accion}</td>
+              <td><span class="badge ${badgeClass}">${log.resultado}</span></td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    function renderClients() {
+      const clients = Object.values(MOCK_USERS).filter((u) => u.role === "cliente");
+      document.getElementById("clients-tbody").innerHTML = clients
+        .map(
+          (c) => `
+            <tr>
+              <td><strong>#${c.id}</strong></td>
+              <td>${c.nombre}</td>
+              <td>${c.email}</td>
+              <td>${c.pedidos.length}</td>
+              <td>
+                <a href="perfil.html?id=${c.id}" class="btn btn-secondary btn-sm">Ver perfil #${c.id}</a>
+              </td>
+            </tr>
+          `
+        )
+        .join("");
+    }
+
+    document.getElementById("toggle-security-btn").addEventListener("click", () => {
+      const nextMode = getSecurityMode() === "vulnerable" ? "protected" : "vulnerable";
+      setSecurityMode(nextMode);
+      addAuditLog({
+        actorId: currentUser.id,
+        actorNombre: currentUser.nombre,
+        targetId: "-",
+        accion: nextMode === "protected"
+          ? "Activó control de autorización en el servidor"
+          : "Restauró modo vulnerable para demostración",
+        resultado: nextMode === "protected" ? "Autorizado" : "Modo vulnerable"
+      });
+      renderSecurityState();
+      renderAuditLogs();
+      document.getElementById("status-announcement").textContent =
+        nextMode === "protected"
+          ? "Control de autorización activado."
+          : "Modo vulnerable restaurado.";
+    });
+
+    document.getElementById("reset-demo-btn").addEventListener("click", () => {
+      resetSimulation();
+      renderSecurityState();
+      renderAuditLogs();
+      document.getElementById("status-announcement").textContent = "Simulación reiniciada a modo vulnerable.";
+    });
+
+    renderSecurityState();
+    renderAuditLogs();
+    renderClients();
+  </script>
+</body>
+</html>

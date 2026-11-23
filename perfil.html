@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Perfil | NovaComercial Portal de Clientes</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Saltar al contenido principal</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">NC</span>
+        <span>NovaComercial</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Navegación principal">
+        <span id="session-pill" class="user-pill"></span>
+        <a id="my-profile-link" href="#" class="btn btn-secondary btn-sm">Mi perfil</a>
+        <a id="admin-link" href="admin.html" class="btn btn-secondary btn-sm" hidden>Panel Admin</a>
+        <button type="button" id="logout-btn" class="btn btn-secondary btn-sm">Cerrar sesión</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" class="container">
+    <!-- Vista de Perfil (Visible cuando está autorizado o en modo vulnerable) -->
+    <div id="profile-view" hidden>
+      <div class="flex-between" style="margin-bottom: 1rem;">
+        <div>
+          <h1 id="profile-heading" tabindex="-1">Perfil del Cliente</h1>
+          <p class="subtitle" style="margin-bottom: 0;">
+            Consulta tu información personal, historial de pedidos y facturas electrónicas.
+          </p>
+        </div>
+        <span id="profile-id-badge" class="badge badge-info"></span>
+      </div>
+
+      <!-- Resumen rápido -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Número de cliente</div>
+          <div id="stat-id" class="stat-value"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pedidos registrados</div>
+          <div id="stat-orders" class="stat-value"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Facturas emitidas</div>
+          <div id="stat-invoices" class="stat-value"></div>
+        </div>
+      </div>
+
+      <!-- Datos personales -->
+      <section class="card" aria-labelledby="personal-info-title">
+        <h2 id="personal-info-title">Datos personales y de envío</h2>
+        <dl id="personal-info-list" class="info-list"></dl>
+      </section>
+
+      <!-- Pedidos -->
+      <section class="card" aria-labelledby="orders-title">
+        <h2 id="orders-title">Mis pedidos recientes</h2>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Historial de pedidos del cliente</caption>
+            <thead>
+              <tr>
+                <th scope="col">No. Pedido</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Producto</th>
+                <th scope="col">Total</th>
+                <th scope="col">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Facturas -->
+      <section class="card" aria-labelledby="invoices-title">
+        <h2 id="invoices-title">Mis facturas</h2>
+        <div class="table-wrap">
+          <table>
+            <caption class="visually-hidden">Facturas electrónicas emitidas</caption>
+            <thead>
+              <tr>
+                <th scope="col">Folio</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Concepto</th>
+                <th scope="col">Total</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Vista 403 Acceso Denegado (Visible en modo protegido cuando ID no coincide) -->
+    <section id="denied-view" class="card denied-card" hidden aria-labelledby="denied-heading">
+      <div class="denied-icon" aria-hidden="true">403</div>
+      <h1 id="denied-heading" tabindex="-1">Acceso denegado</h1>
+      <p id="denied-message" class="subtitle" style="margin-top: 0.5rem;"></p>
+      <div class="alert alert-info" style="text-align: left;">
+        <strong>Control de autorización activo:</strong> El servidor ha verificado tu identidad y comprobado que tu sesión no tiene permisos para consultar este recurso.
+      </div>
+      <a id="back-to-own-profile" href="#" class="btn btn-primary">Volver a mi perfil</a>
+    </section>
+
+    <!-- Vista de usuario no encontrado -->
+    <section id="not-found-view" class="card denied-card" hidden aria-labelledby="not-found-heading">
+      <h1 id="not-found-heading" tabindex="-1">Perfil no encontrado</h1>
+      <p class="subtitle">No existe un cliente registrado con el identificador especificado.</p>
+      <a id="not-found-back" href="#" class="btn btn-primary">Volver a mi perfil</a>
+    </section>
+  </main>
+
+  <!-- Modal nativo para detalle de factura -->
+  <dialog id="invoice-dialog" aria-labelledby="dialog-invoice-title">
+    <div class="dialog-header">
+      <h2 id="dialog-invoice-title">Detalle de factura</h2>
+      <button type="button" id="close-dialog-btn" class="btn btn-secondary btn-sm">Cerrar</button>
+    </div>
+    <dl id="dialog-invoice-body" class="info-list"></dl>
+  </dialog>
+
+  <footer class="site-footer">
+    NovaComercial S.A. de C.V. · Portal de Clientes
+  </footer>
+
+  <script src="data.js"></script>
+  <script>
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      window.location.href = "index.html";
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const rawId = params.get("id");
+    if (!rawId) {
+      window.location.replace(`perfil.html?id=${currentUser.id}`);
+    }
+
+    const requestedId = Number(rawId);
+    const securityMode = getSecurityMode();
+
+    // Header UI
+    const sessionPill = document.getElementById("session-pill");
+    sessionPill.innerHTML = `Sesión: <strong>${currentUser.nombre}</strong> (ID #${currentUser.id})`;
+
+    const myProfileLink = document.getElementById("my-profile-link");
+    myProfileLink.href = `perfil.html?id=${currentUser.id}`;
+
+    if (currentUser.role === "admin") {
+      document.getElementById("admin-link").hidden = false;
+    }
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+
+    // Evaluar autorización
+    const isOwner = currentUser.id === requestedId;
+    const isAdmin = currentUser.role === "admin";
+    const isAuthorized = isOwner || isAdmin;
+
+    const targetUser = MOCK_USERS[requestedId];
+
+    if (securityMode === "protected" && !isAuthorized) {
+      // Escena 5: Acceso denegado por control de autorización
+      document.title = "Acceso denegado (403) | NovaComercial";
+      addAuditLog({
+        actorId: currentUser.id,
+        actorNombre: currentUser.nombre,
+        targetId: requestedId,
+        accion: `Intento de consulta a perfil?id=${requestedId}`,
+        resultado: "Bloqueado (403)"
+      });
+
+      const deniedView = document.getElementById("denied-view");
+      document.getElementById("denied-message").textContent =
+        `No tienes permisos para ver la información del perfil #${requestedId}. Tu sesión actual (#${currentUser.id}) solo está autorizada para consultar tus propios datos.`;
+      document.getElementById("back-to-own-profile").href = `perfil.html?id=${currentUser.id}`;
+      deniedView.hidden = false;
+    } else if (!targetUser) {
+      document.title = "Perfil no encontrado | NovaComercial";
+      document.getElementById("not-found-back").href = `perfil.html?id=${currentUser.id}`;
+      document.getElementById("not-found-view").hidden = false;
+    } else {
+      // Renderizar perfil (en modo vulnerable permite ver cualquier ID si está autenticado)
+      document.title = `${targetUser.nombre} (ID #${targetUser.id}) | NovaComercial`;
+
+      addAuditLog({
+        actorId: currentUser.id,
+        actorNombre: currentUser.nombre,
+        targetId: targetUser.id,
+        accion: `Consulta a perfil?id=${targetUser.id}`,
+        resultado: isAuthorized ? "Autorizado" : "Acceso no autorizado (Vulnerable)"
+      });
+
+      document.getElementById("profile-view").hidden = false;
+      document.getElementById("profile-heading").textContent = `Bienvenido, ${targetUser.nombre}`;
+      document.getElementById("profile-id-badge").textContent = `ID de Cliente: #${targetUser.id}`;
+
+      document.getElementById("stat-id").textContent = `#${targetUser.id}`;
+      document.getElementById("stat-orders").textContent = String(targetUser.pedidos.length);
+      document.getElementById("stat-invoices").textContent = String(targetUser.facturas.length);
+
+      // Datos personales
+      const personalList = document.getElementById("personal-info-list");
+      const fields = [
+        ["Nombre completo", targetUser.nombre],
+        ["Correo electrónico", targetUser.email],
+        ["Teléfono", targetUser.telefono],
+        ["Dirección de envío", targetUser.direccion],
+        ["RFC / Identificación fiscal", targetUser.rfc],
+        ["Método de pago guardado", targetUser.metodoPago],
+        ["Cliente desde", targetUser.fechaRegistro]
+      ];
+      personalList.innerHTML = fields
+        .map(
+          ([dt, dd]) => `
+            <div class="info-item">
+              <dt>${dt}</dt>
+              <dd>${dd}</dd>
+            </div>
+          `
+        )
+        .join("");
+
+      // Pedidos
+      const ordersTbody = document.getElementById("orders-tbody");
+      if (targetUser.pedidos.length === 0) {
+        ordersTbody.innerHTML = `<tr><td colspan="5">No hay pedidos registrados en esta cuenta.</td></tr>`;
+      } else {
+        ordersTbody.innerHTML = targetUser.pedidos
+          .map((p) => {
+            const badgeClass =
+              p.estado === "Entregado"
+                ? "badge-success"
+                : p.estado === "En camino"
+                  ? "badge-info"
+                  : "badge-warning";
+            return `
+              <tr>
+                <td><strong>${p.id}</strong></td>
+                <td>${p.fecha}</td>
+                <td>${p.producto}</td>
+                <td>${p.total}</td>
+                <td><span class="badge ${badgeClass}">${p.estado}</span></td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      // Facturas
+      const invoicesTbody = document.getElementById("invoices-tbody");
+      const invoiceDialog = document.getElementById("invoice-dialog");
+      const dialogBody = document.getElementById("dialog-invoice-body");
+
+      if (targetUser.facturas.length === 0) {
+        invoicesTbody.innerHTML = `<tr><td colspan="6">No hay facturas emitidas en esta cuenta.</td></tr>`;
+      } else {
+        invoicesTbody.innerHTML = targetUser.facturas
+          .map(
+            (f, idx) => `
+              <tr>
+                <td><strong>${f.folio}</strong></td>
+                <td>${f.fecha}</td>
+                <td>${f.concepto}</td>
+                <td>${f.total}</td>
+                <td><span class="badge badge-success">${f.estado}</span></td>
+                <td>
+                  <button type="button" class="btn btn-secondary btn-sm view-invoice-btn" data-index="${idx}">
+                    Ver detalle <span class="visually-hidden">${f.folio}</span>
+                  </button>
+                </td>
+              </tr>
+            `
+          )
+          .join("");
+
+        document.querySelectorAll(".view-invoice-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const inv = targetUser.facturas[Number(btn.dataset.index)];
+            document.getElementById("dialog-invoice-title").textContent = `Factura ${inv.folio}`;
+            dialogBody.innerHTML = `
+              <div class="info-item"><dt>Titular</dt><dd>${targetUser.nombre}</dd></div>
+              <div class="info-item"><dt>RFC</dt><dd>${targetUser.rfc}</dd></div>
+              <div class="info-item"><dt>Fecha de emisión</dt><dd>${inv.fecha}</dd></div>
+              <div class="info-item"><dt>Concepto</dt><dd>${inv.concepto}</dd></div>
+              <div class="info-item"><dt>Subtotal</dt><dd>${inv.subtotal}</dd></div>
+              <div class="info-item"><dt>IVA (16%)</dt><dd>${inv.iva}</dd></div>
+              <div class="info-item"><dt>Total pagado</dt><dd><strong>${inv.total}</strong></dd></div>
+              <div class="info-item"><dt>Estado</dt><dd>${inv.estado}</dd></div>
+            `;
+            invoiceDialog.showModal();
+          });
+        });
+      }
+
+      document.getElementById("close-dialog-btn").addEventListener("click", () => {
+        invoiceDialog.close();
+      });
+    }
+  </script>
+</body>
+</html>

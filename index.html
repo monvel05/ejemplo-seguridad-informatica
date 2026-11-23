@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión | NovaComercial Portal de Clientes</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link visually-hidden">Saltar al contenido principal</a>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" aria-hidden="true">NC</span>
+        <span>NovaComercial</span>
+      </a>
+      <span class="badge badge-info">Portal de Clientes</span>
+    </div>
+  </header>
+
+  <main id="main-content" class="container-narrow">
+    <div class="card">
+      <h1>Iniciar sesión</h1>
+      <p class="subtitle">Accede a tu cuenta para consultar tus datos personales, pedidos y facturas.</p>
+
+      <div id="login-error" class="alert alert-danger" role="alert" hidden></div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label for="email">Correo electrónico <span aria-hidden="true">*</span></label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="username"
+            autocorrect="off"
+            autocapitalize="none"
+            spellcheck="false"
+            enterkeyhint="next"
+            required
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="password">Contraseña <span aria-hidden="true">*</span></label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            autocomplete="current-password"
+            enterkeyhint="done"
+            required
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full">Entrar al portal</button>
+      </form>
+    </div>
+
+    <section class="demo-box" aria-labelledby="demo-heading">
+      <h2 id="demo-heading">Cuentas de prueba para la simulación</h2>
+      <p class="subtitle" style="margin-bottom: 0.5rem; font-size: 0.85rem;">
+        Selecciona un personaje para autocompletar e iniciar sesión rápidamente:
+      </p>
+      <div class="demo-account-list">
+        <button type="button" class="demo-account-btn" data-email="laura.mendoza@correo.com" data-pass="Laura2026!">
+          <span>
+            <strong>Víctima — Laura Mendoza (ID #106)</strong>
+            <span class="demo-account-meta">laura.mendoza@correo.com · Cliente</span>
+          </span>
+          <span class="badge badge-info">Entrar</span>
+        </button>
+
+        <button type="button" class="demo-account-btn" data-email="carlos.ruiz@correo.com" data-pass="Carlos2026!">
+          <span>
+            <strong>Atacante — Carlos Ruiz (ID #105)</strong>
+            <span class="demo-account-meta">carlos.ruiz@correo.com · Cliente</span>
+          </span>
+          <span class="badge badge-warning">Entrar</span>
+        </button>
+
+        <button type="button" class="demo-account-btn" data-email="admin@novacomercial.com" data-pass="Admin2026!">
+          <span>
+            <strong>Administrador — Ing. Roberto Sánchez</strong>
+            <span class="demo-account-meta">admin@novacomercial.com · Seguridad</span>
+          </span>
+          <span class="badge badge-success">Entrar</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    NovaComercial S.A. de C.V. · Entorno educativo de simulación de seguridad web
+  </footer>
+
+  <script src="data.js"></script>
+  <script>
+    const form = document.getElementById("login-form");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const errorBox = document.getElementById("login-error");
+
+    // Si ya hay sesión activa, redirigir según rol
+    const existingUser = getCurrentUser();
+    if (existingUser) {
+      if (existingUser.role === "admin") {
+        window.location.href = "admin.html";
+      } else {
+        window.location.href = `perfil.html?id=${existingUser.id}`;
+      }
+    }
+
+    function performLogin(email, password) {
+      errorBox.hidden = true;
+      errorBox.textContent = "";
+
+      const user = loginWithCredentials(email, password);
+      if (!user) {
+        errorBox.textContent = "Correo o contraseña incorrectos. Verifica tus datos o usa una cuenta de prueba.";
+        errorBox.hidden = false;
+        emailInput.setAttribute("aria-invalid", "true");
+        emailInput.focus();
+        return;
+      }
+
+      emailInput.removeAttribute("aria-invalid");
+      if (user.role === "admin") {
+        window.location.href = "admin.html";
+      } else {
+        window.location.href = `perfil.html?id=${user.id}`;
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!emailInput.value.trim() || !passwordInput.value) {
+        errorBox.textContent = "Por favor ingresa tu correo y contraseña.";
+        errorBox.hidden = false;
+        if (!emailInput.value.trim()) {
+          emailInput.focus();
+        } else {
+          passwordInput.focus();
+        }
+        return;
+      }
+      performLogin(emailInput.value, passwordInput.value);
+    });
+
+    document.querySelectorAll(".demo-account-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const email = btn.dataset.email;
+        const pass = btn.dataset.pass;
+        emailInput.value = email;
+        passwordInput.value = pass;
+        performLogin(email, pass);
+      });
+    });
+  </script>
+</body>
+</html>
